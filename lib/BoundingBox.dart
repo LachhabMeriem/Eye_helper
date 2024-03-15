@@ -1,23 +1,21 @@
 class BoundingBox {
-  final double x1;
-  final double y1;
-  final double x2;
-  final double y2;
-  final double cx;
-  final double cy;
-  final double w;
-  final double h;
-  final double cnf;
+  final int maxClsIdx;
+  final double left;
+  final double top;
+  final double right;
+  final double bottom ;
+  final double width;
+  final double height;
+  final double maxClsConfidence;
 
   BoundingBox({
-    required this.x1,
-    required this.y1,
-    required this.x2,
-    required this.y2,
-    required this.cx,
-    required this.cy,
-    required this.w,
-    required this.h,
-    required this.cnf,
+    required this.maxClsIdx,
+    required this.left,
+    required this.top,
+    required this.right ,
+    required this.bottom ,
+    required this.width,
+    required this.height,
+    required this.maxClsConfidence,
   });
 }

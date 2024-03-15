@@ -1,9 +1,10 @@
 import 'dart:developer';
 import 'dart:io';
 import 'dart:math' as math ;
+import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
-import 'package:image/image.dart';
+
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'BoundingBox.dart' ;
 import 'dart:typed_data' ;
@@ -45,48 +46,82 @@ class ObjectDetection {
     log('Loading labels...');
     final labelsRaw = await rootBundle.loadString(_labelPath);
     _labels = labelsRaw.split('\n');
+
   }
 
-  Uint8List imageToByteListFloat32( img.Image image, int inputSize, double mean, double std) {
-    var convertedBytes = Float32List(1 * inputSize * inputSize * 3 );
+  Uint8List imageToByteListFloat32(img.Image image, int inputSize, double mean, double std) {
+    var convertedBytes = Float32List(1 * inputSize * inputSize * 3);
     var buffer = Float32List.view(convertedBytes.buffer);
     int pixelIndex = 0;
     for (var i = 0; i < inputSize; i++) {
       for (var j = 0; j < inputSize; j++) {
         var pixel = image.getPixel(j, i);
-        buffer[pixelIndex++] = (img.getLuminance(pixel) - mean) / std;
+        buffer[pixelIndex++] = (pixel.r - mean) / std;
+        buffer[pixelIndex++] = (pixel.g - mean) / std;
+        buffer[pixelIndex++] = (pixel.b - mean) / std;
       }
     }
     return convertedBytes.buffer.asUint8List();
   }
 
-  Uint8List analyseImage(String imagePath) {
+  img.Image convertYUV420ToImage(CameraImage cameraImage) {
+    final imageWidth = cameraImage.width;
+    final imageHeight = cameraImage.height;
+
+    final yBuffer = cameraImage.planes[0].bytes;
+    final uBuffer = cameraImage.planes[1].bytes;
+    final vBuffer = cameraImage.planes[2].bytes;
+
+    final int yRowStride = cameraImage.planes[0].bytesPerRow;
+    final int yPixelStride = cameraImage.planes[0].bytesPerPixel!;
+
+    final int uvRowStride = cameraImage.planes[1].bytesPerRow;
+    final int uvPixelStride = cameraImage.planes[1].bytesPerPixel!;
+
+    final image = img.Image(width: imageWidth, height: imageHeight);
+
+    for (int h = 0; h < imageHeight; h++) {
+      int uvh = (h / 2).floor();
+
+      for (int w = 0; w < imageWidth; w++) {
+        int uvw = (w / 2).floor();
+
+        final yIndex = (h * yRowStride) + (w * yPixelStride);
+
+        // Y plane should have positive values belonging to [0...255]
+        final int y = yBuffer[yIndex];
+
+        final int uvIndex = (uvh * uvRowStride) + (uvw * uvPixelStride);
+
+        final int u = uBuffer[uvIndex];
+        final int v = vBuffer[uvIndex];
+
+        int r = (y + v * 1436 / 1024 - 179).round();
+        int g = (y - u * 46549 / 131072 + 44 - v * 93604 / 131072 + 91).round();
+        int b = (y + u * 1814 / 1024 - 227).round();
+
+        r = r.clamp(0, 255);
+        g = g.clamp(0, 255);
+        b = b.clamp(0, 255);
+
+        image.setPixelRgb(w, h, r, g, b);
+      }
+    }
+
+    return image;
+  }
+
+  List<BoundingBox>? analyseImage(final cameraImage)  {
     log('Analysing image...');
-    // Reading image bytes from file
-    final imageData = File(imagePath).readAsBytesSync();
-    final Interpolation _interpolation = Interpolation.linear;
-    // Decoding image
-    final image = img.decodeImage(imageData);
+
+    final image = convertYUV420ToImage(cameraImage);
     final imageInput = img.copyResize(
-      image!,
+      image ,
       width: 640,
       height: 640,
     );
-    final imageMatrix = imageToByteListFloat32(imageInput,TENSOR_WIDTH,INPUT_MEAN,INPUT_STANDARD_DEVIATION);
-    print(imageMatrix);
 
-    // Creating matrix representation, [300, 300, 3]
-    // final imageMatrix = List.generate(
-    //   imageInput.height,
-    //       (y) => List.generate(
-    //     imageInput.width,
-    //         (x) {
-    //       final pixel = imageInput.getPixel(x, y);
-    //       return [pixel.r, pixel.g, pixel.b];
-    //     },
-    //   ),
-    // );
-    // final input = normalizeImage(imageMatrix);
+    final imageMatrix = imageToByteListFloat32(imageInput, 640, INPUT_MEAN,INPUT_STANDARD_DEVIATION);
 
     final output = _runInference(imageMatrix) ;
     final DoubleOutput = output.flatten() ;
@@ -100,123 +135,74 @@ class ObjectDetection {
       }
     }).toList();
     Float32List floatArray = Float32List.fromList(floatList);
-    final bestBoxes = bestBox(floatArray) ;
-    // print(bestBoxes);
-
-
-    // final boxesTensor = output.map((e) => e.sublist(0,4)).toList();
-    // final scoresTensor = output.map((e) => e.sublist(4,5)).toList();
-    // final classesTensor = output.map((e) => e.sublist(5)).toList();
-    //
-    // // Process bounding boxes
-    // final List locations = boxesTensor
-    //     .map((box) => box.map((value) => ((value * 300).toInt())).toList())
-    //     .toList();
-    //
-    // // Convert class indices to int
-    // final classes = classesTensor.map((value) => value.toInt()).toList();
-    //
-    // // Number of detections
-    // final numberOfDetections = output[2].first as double;
-    //
-    // // Get classifcation with label
-    // final List<String> classification = [];
-    // for (int i = 0; i < numberOfDetections; i++) {
-    //   classification.add(_labels![classes[i]]);
-    // }
-    //
-    // log('Outlining objects...');
-    // for (var i = 0; i < numberOfDetections; i++) {
-    //   if (scoresTensor[i] > 0.85) {
-    //     // Rectangle drawing
-    //     img.drawRect(
-    //       imageInput,
-    //       x1: locations[i][1],
-    //       y1: locations[i][0],
-    //       x2: locations[i][3],
-    //       y2: locations[i][2],
-    //       color: img.ColorRgb8(0, 255, 0),
-    //       thickness: 3,
-    //     );
-    //
-    //     // Label drawing
-    //     img.drawString(
-    //       imageInput,
-    //       '${classification[i]} ${scoresTensor[i]}',
-    //       font: img.arial14,
-    //       x: locations[i][1] + 7,
-    //       y: locations[i][0] + 7,
-    //       color: img.ColorRgb8(0, 255, 0),
-    //     );
-    //   }
-    // }
-
+    final bestbox = bestBox(floatArray);
     log('Done.');
-    return img.encodeJpg(imageInput);
+    // return img.encodeJpg(imageInput);
+    return bestbox ;
   }
 
-  List _runInference(
-      final imageMatrix,
-      ) {
+  List _runInference(final imageMatrix,) {
     log('Running inference...');
 
     final input = imageMatrix;
     final output = List<num>.filled(1 * 84 * 8400, 0).reshape([1, 84, 8400]);
-    _interpreter!.runForMultipleInputs([input], {0: output }) ;
+    _interpreter!.runForMultipleInputs( [input.buffer] , {0: output }) ;
     return output;
   }
-  List<BoundingBox>? bestBox(Float32List array) {
+
+  List<BoundingBox>? bestBox(List<double> floatArray) {
     List<BoundingBox> boundingBoxes = [];
-    for (int c = 0; c < NUM_ELEMENTS; c++) {
-      double cnf = array[c + NUM_ELEMENTS * 4];
-      print(cnf);
-      if (cnf > CONFIDENCE_THRESHOLD) {
-        double cx = array[c];
-        double cy = array[c + NUM_ELEMENTS];
-        double w = array[c + NUM_ELEMENTS * 2];
-        double h = array[c + NUM_ELEMENTS * 3];
-        double x1 = cx - (w / 2);
-        double y1 = cy - (h / 2);
-        double x2 = cx + (w / 2);
-        double y2 = cy + (h / 2);
-        if (x1 <= 0 || x1 >= TENSOR_WIDTH_FLOAT) continue;
-        if (y1 <= 0 || y1 >= TENSOR_HEIGHT_FLOAT) continue;
-        if (x2 <= 0 || x2 >= TENSOR_WIDTH_FLOAT) continue;
-        if (y2 <= 0 || y2 >= TENSOR_HEIGHT_FLOAT) continue;
-        boundingBoxes.add(
-          BoundingBox(
-            x1: x1,
-            y1: y1,
-            x2: x2,
-            y2: y2,
-            cx: cx,
-            cy: cy,
-            w: w,
-            h: h,
-            cnf: cnf,
-          ),
-        );
+    for (int i = 0; i < NUM_ELEMENTS; i++) {
+      double x = floatArray[i];
+      double y = floatArray[NUM_ELEMENTS * 1 + i];
+      double w = floatArray[NUM_ELEMENTS * 2 + i];
+      double h = floatArray[NUM_ELEMENTS * 3 + i];
+      double left = (x - (0.5 * w)) ;   // x1
+      double top = (y - (0.5 * y)) ; // y1
+      double right = (x + (0.5 * w) ) ; // x2
+      double bottom =  (y + (0.5 * y)) ; // y2
+      double width = w ;
+      double height = h ;
+      List<double> cls_confidences = [];
+      for (int j = 0; j < 80; j++) {
+        cls_confidences.add(floatArray[NUM_ELEMENTS * (4 + j) + i]);
       }
+      int maxClsIdx = cls_confidences.indexOf(cls_confidences.reduce(math.max));
+      double maxClsConfidence = cls_confidences[maxClsIdx];
+      if (maxClsConfidence < 0.2) {
+        continue;
+      }
+      boundingBoxes.add(
+        BoundingBox(
+          maxClsIdx: maxClsIdx,
+          left: left,
+          top: top,
+          right : right ,
+          bottom: bottom ,
+          width: width,
+          height: height,
+          maxClsConfidence: maxClsConfidence,
+        ),
+      );
     }
     if (boundingBoxes.isEmpty) return null;
-    print(boundingBoxes);
     return applyNMS(boundingBoxes);
   }
 
   double calculateIoU(BoundingBox box1, BoundingBox box2) {
-    double x1 = math.max(box1.x1, box2.x1);
-    double y1 = math.max(box1.y1, box2.y1);
-    double x2 = math.min(box1.x2, box2.x2);
-    double y2 = math.min(box1.y2, box2.y2);
+    double x1 = math.max(box1.left, box2.left);
+    double y1 = math.max(box1.top, box2.top);
+    double x2 = math.min(box1.right, box2.right);
+    double y2 = math.min(box1.bottom, box2.bottom);
     double intersectionArea = math.max(0, x2 - x1) * math.max(0, y2 - y1);
-    double box1Area = box1.w * box1.h;
-    double box2Area = box2.w * box2.h;
+    double box1Area = box1.width * box1.height;
+    double box2Area = box2.width * box2.height;
     return intersectionArea / (box1Area + box2Area - intersectionArea);
   }
 
   List<BoundingBox> applyNMS(List<BoundingBox> boxes) {
     List<BoundingBox> sortedBoxes = List.from(boxes)
-      ..sort((a, b) => (b.w * b.h).compareTo(a.w * a.h));
+      ..sort((a, b) => (b.width * b.height).compareTo(a.width * a.height));
     List<BoundingBox> selectedBoxes = [];
     while (sortedBoxes.isNotEmpty) {
       BoundingBox first = sortedBoxes.first;
