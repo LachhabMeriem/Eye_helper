@@ -71,14 +71,14 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'drawingboxes.dart';
 import 'object_detection.dart';
 import 'dart:io' show Platform;
+import 'BoundingBoxPage.dart';
 
 void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key});
 
   @override
   Widget build(BuildContext context) {
@@ -95,7 +95,7 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHome extends StatefulWidget {
-  const MyHome({super.key});
+  const MyHome({Key? key});
 
   @override
   State<MyHome> createState() => _MyHomeState();
@@ -110,49 +110,30 @@ class _MyHomeState extends State<MyHome> {
   void initState() {
     super.initState();
     objectDetection = ObjectDetection();
+    _launchCamera();
+  }
+
+  Future<void> _launchCamera() async {
+    final result = await imagePicker.pickImage(source: ImageSource.camera);
+    if (result != null) {
+      objectDetection!.analyseImage(result.path);
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BndBoxPage(
+            objectDetection: objectDetection!,
+          ),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: <Widget>[
-            SizedBox(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  if (Platform.isAndroid || Platform.isIOS)
-                    IconButton(
-                      onPressed: () async {
-                        final result = await imagePicker.pickImage(
-                          source: ImageSource.camera,
-                        );
-                        if (result != null) {
-                          objectDetection!.analyseImage(result.path);
-                          setState(() {});
-                        }
-                      },
-                      icon: const Icon(
-                        Icons.camera,
-                        size: 64,
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // Ajouter BndBox ici
-            if (objectDetection?.getbestBoxes != null && objectDetection?.labels != null)
-              Expanded(
-                child: BndBox(
-                  objectDetection?.getbestBoxes,
-                  objectDetection?.labels,
-                  objectDetection?.Width,
-                  objectDetection?.Height,
-                  objectDetection?.OriginalImage!,
-                ),
-              ),
-          ],
+        child: Center(
+          child: CircularProgressIndicator(),
         ),
       ),
     );
