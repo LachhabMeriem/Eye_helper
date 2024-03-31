@@ -29,7 +29,7 @@ class ObjectDetection {
     log('Done.');
   }
 
-  get getbestBoxes => bestBox;
+  get getbestBoxes => bestbox;
   get Image => OriginalImage;
   get labels => _labels ;
   get Width => width;
