@@ -18,10 +18,9 @@ class ObjectDetection {
   List<BoundingBox>? bestbox;
   Interpreter? _interpreter;
   List<String>? _labels;
-
   late final OriginalImage ;
-  late final width ;
-  late final height ;
+  late final ScreenX ;
+  late final ScreenY ;
 
   ObjectDetection() {
     _loadModel();
@@ -32,8 +31,8 @@ class ObjectDetection {
   get getbestBoxes => bestbox;
   get Image => OriginalImage;
   get labels => _labels ;
-  get Width => width;
-  get Height => height;
+  get Width => ScreenX;
+  get Height => ScreenY;
 
 
   Future<void> _loadModel() async {
@@ -130,8 +129,10 @@ class ObjectDetection {
     // final image = convertYUV420ToImage(cameraImage);
     final imageData = File(imagePath).readAsBytesSync();
     final image = img.decodeImage(imageData);
-    width = image?.width ;
-    height = image?.height ;
+    ScreenX = image?.width ;
+    ScreenY = image?.height ;
+    print(ScreenX);
+    print(ScreenY);
     final imageInput = img.copyResize(
       image! ,
       width: 640,
@@ -156,7 +157,8 @@ class ObjectDetection {
     OriginalImage = img.encodeJpg(image);
     log('Done.');
     for (final box in bestbox!){
-      print(_labels?[box.maxClsIdx]);
+      print(_labels?[box.maxClsIdx] );
+      print(box.maxClsConfidence);
     }
     // return img.encodeJpg(image);
     // return bestbox ;
@@ -207,7 +209,8 @@ class ObjectDetection {
       );
     }
     if (boundingBoxes.isEmpty) return null;
-    return applyNMS(boundingBoxes);
+    final result = applyNMS(boundingBoxes);
+    return filtrerMaxConfidence(result!);
   }
 
   double calculateIoU(BoundingBox box1, BoundingBox box2) {
@@ -239,6 +242,27 @@ class ObjectDetection {
       }
     }
     return selectedBoxes;
+  }
+  List<BoundingBox> filtrerMaxConfidence(List<BoundingBox> boundingBoxes) {
+    Map<int, BoundingBox> tempMap = {};
+    for (var box in boundingBoxes) {
+      if (!tempMap.containsKey(box.maxClsIdx)) {
+        tempMap[box.maxClsIdx] = box;
+      } else {
+        if (box.maxClsConfidence > tempMap[box.maxClsIdx]!.maxClsConfidence) {
+          tempMap[box.maxClsIdx] = box;
+        }
+      }
+    }
+    return tempMap.values.toList();
+  }
+  void dispose() {
+    _interpreter?.close();
+    bestbox = null;
+    _labels = null;
+    OriginalImage = null;
+    ScreenX = null ;
+    ScreenY  = null;
   }
 
   static  int TENSOR_WIDTH = 640;
