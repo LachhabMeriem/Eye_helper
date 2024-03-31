@@ -9,19 +9,32 @@ import 'package:tflite_flutter/tflite_flutter.dart';
 import 'BoundingBox.dart' ;
 import 'dart:typed_data' ;
 
+import 'drawingboxes.dart';
+
 
 class ObjectDetection {
   static const String _modelPath = 'assets/models/yolov8n.tflite';
   static const String _labelPath = 'assets/labels.txt';
-
+  List<BoundingBox>? bestbox;
   Interpreter? _interpreter;
   List<String>? _labels;
+
+  late final OriginalImage ;
+  late final width ;
+  late final height ;
 
   ObjectDetection() {
     _loadModel();
     _loadLabels();
     log('Done.');
   }
+
+  get getbestBoxes => bestBox;
+  get Image => OriginalImage;
+  get labels => _labels ;
+  get Width => width;
+  get Height => height;
+
 
   Future<void> _loadModel() async {
     log('Loading interpreter options...');
@@ -111,12 +124,16 @@ class ObjectDetection {
     return image;
   }
 
-  List<BoundingBox>? analyseImage(final cameraImage)  {
+  void analyseImage(final imagePath)  {
     log('Analysing image...');
 
-    final image = convertYUV420ToImage(cameraImage);
+    // final image = convertYUV420ToImage(cameraImage);
+    final imageData = File(imagePath).readAsBytesSync();
+    final image = img.decodeImage(imageData);
+    width = image?.width ;
+    height = image?.height ;
     final imageInput = img.copyResize(
-      image ,
+      image! ,
       width: 640,
       height: 640,
     );
@@ -135,10 +152,14 @@ class ObjectDetection {
       }
     }).toList();
     Float32List floatArray = Float32List.fromList(floatList);
-    final bestbox = bestBox(floatArray);
+    bestbox = bestBox(floatArray);
+    OriginalImage = img.encodeJpg(image);
     log('Done.');
-    // return img.encodeJpg(imageInput);
-    return bestbox ;
+    for (final box in bestbox!){
+      print(_labels?[box.maxClsIdx]);
+    }
+    // return img.encodeJpg(image);
+    // return bestbox ;
   }
 
   List _runInference(final imageMatrix,) {
@@ -200,7 +221,7 @@ class ObjectDetection {
     return intersectionArea / (box1Area + box2Area - intersectionArea);
   }
 
-  List<BoundingBox> applyNMS(List<BoundingBox> boxes) {
+  List<BoundingBox>? applyNMS(List<BoundingBox> boxes) {
     List<BoundingBox> sortedBoxes = List.from(boxes)
       ..sort((a, b) => (b.width * b.height).compareTo(a.width * a.height));
     List<BoundingBox> selectedBoxes = [];
