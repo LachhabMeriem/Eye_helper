@@ -1,39 +1,47 @@
 import 'dart:developer';
 import 'dart:io';
-import 'dart:math' as math ;
+import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
-
 import 'package:tflite_flutter/tflite_flutter.dart';
-import 'BoundingBox.dart' ;
-import 'dart:typed_data' ;
-
+import 'BoundingBox.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'drawingboxes.dart';
-
+import 'package:flutter_tts/flutter_tts.dart';
 
 class ObjectDetection {
+  stt.SpeechToText _speech = stt.SpeechToText();
+  FlutterTts flutterTts = FlutterTts();
+
   static const String _modelPath = 'assets/models/yolov8n.tflite';
   static const String _labelPath = 'assets/labels.txt';
   List<BoundingBox>? bestbox;
   Interpreter? _interpreter;
   List<String>? _labels;
-  late final OriginalImage ;
-  late final ScreenX ;
-  late final ScreenY ;
+  late final OriginalImage;
+  late final ScreenX;
+  late final ScreenY;
 
   ObjectDetection() {
     _loadModel();
     _loadLabels();
     log('Done.');
+
+    // Initialiser le moteur de reconnaissance vocale
+    _speech.initialize();
   }
 
   get getbestBoxes => bestbox;
-  get Image => OriginalImage;
-  get labels => _labels ;
-  get Width => ScreenX;
-  get Height => ScreenY;
 
+  get Image => OriginalImage;
+
+  get labels => _labels;
+
+  get Width => ScreenX;
+
+  get Height => ScreenY;
 
   Future<void> _loadModel() async {
     log('Loading interpreter options...');
@@ -58,10 +66,10 @@ class ObjectDetection {
     log('Loading labels...');
     final labelsRaw = await rootBundle.loadString(_labelPath);
     _labels = labelsRaw.split('\n');
-
   }
 
-  Uint8List imageToByteListFloat32(img.Image image, int inputSize, double mean, double std) {
+  Uint8List imageToByteListFloat32(img.Image image, int inputSize, double mean,
+      double std) {
     var convertedBytes = Float32List(1 * inputSize * inputSize * 3);
     var buffer = Float32List.view(convertedBytes.buffer);
     int pixelIndex = 0;
@@ -109,7 +117,11 @@ class ObjectDetection {
         final int v = vBuffer[uvIndex];
 
         int r = (y + v * 1436 / 1024 - 179).round();
-        int g = (y - u * 46549 / 131072 + 44 - v * 93604 / 131072 + 91).round();
+        int g = (y - u * 46549 / 131072 +
+            44 -
+            v * 93604 / 131072 +
+            91)
+            .round();
         int b = (y + u * 1814 / 1024 - 227).round();
 
         r = r.clamp(0, 255);
@@ -123,26 +135,27 @@ class ObjectDetection {
     return image;
   }
 
-  void analyseImage(final imagePath)  {
+  void analyseImage(final imagePath) async {
     log('Analysing image...');
 
     // final image = convertYUV420ToImage(cameraImage);
     final imageData = File(imagePath).readAsBytesSync();
     final image = img.decodeImage(imageData);
-    ScreenX = image?.width ;
-    ScreenY = image?.height ;
+    ScreenX = image?.width;
+    ScreenY = image?.height;
     print(ScreenX);
     print(ScreenY);
     final imageInput = img.copyResize(
-      image! ,
+      image!,
       width: 640,
       height: 640,
     );
 
-    final imageMatrix = imageToByteListFloat32(imageInput, 640, INPUT_MEAN,INPUT_STANDARD_DEVIATION);
+    final imageMatrix = imageToByteListFloat32(
+        imageInput, 640, INPUT_MEAN, INPUT_STANDARD_DEVIATION);
 
-    final output = _runInference(imageMatrix) ;
-    final DoubleOutput = output.flatten() ;
+    final output = _runInference(imageMatrix);
+    final DoubleOutput = output.flatten();
     List<double> floatList = DoubleOutput.map((value) {
       if (value is double) {
         return value;
@@ -156,20 +169,32 @@ class ObjectDetection {
     bestbox = bestBox(floatArray);
     OriginalImage = img.encodeJpg(image);
     log('Done.');
-    for (final box in bestbox!){
-      print(_labels?[box.maxClsIdx] );
-      print(box.maxClsConfidence);
+
+    // Récupération des noms des objets détectés
+    List<String> detectedObjects = [];
+    for (final box in bestbox!) {
+      if (box.maxClsConfidence > 0.60) {
+        detectedObjects.add(_labels?[box.maxClsIdx] ?? "Unknown");
+      }
     }
-    // return img.encodeJpg(image);
-    // return bestbox ;
+
+    // Lecture des noms des objets détectés
+    await readDetectedObjects(detectedObjects);
   }
 
-  List _runInference(final imageMatrix,) {
+  // Méthode pour lire le nom des objets détectés
+  Future<void> readDetectedObjects(List<String> detectedObjects) async {
+    for (String objectName in detectedObjects) {
+      await flutterTts.speak("Object detected: $objectName");
+    }
+  }
+
+  List _runInference(final imageMatrix) {
     log('Running inference...');
 
     final input = imageMatrix;
     final output = List<num>.filled(1 * 84 * 8400, 0).reshape([1, 84, 8400]);
-    _interpreter!.runForMultipleInputs( [input.buffer] , {0: output }) ;
+    _interpreter!.runForMultipleInputs([input.buffer], {0: output});
     return output;
   }
 
@@ -180,12 +205,12 @@ class ObjectDetection {
       double y = floatArray[NUM_ELEMENTS * 1 + i];
       double w = floatArray[NUM_ELEMENTS * 2 + i];
       double h = floatArray[NUM_ELEMENTS * 3 + i];
-      double left = (x - (0.5 * w)) ;   // x1
-      double top = (y - (0.5 * y)) ; // y1
-      double right = (x + (0.5 * w) ) ; // x2
-      double bottom =  (y + (0.5 * y)) ; // y2
-      double width = w ;
-      double height = h ;
+      double left = (x - (0.5 * w)); // x1
+      double top = (y - (0.5 * y)); // y1
+      double right = (x + (0.5 * w)); // x2
+      double bottom = (y + (0.5 * y)); // y2
+      double width = w;
+      double height = h;
       List<double> cls_confidences = [];
       for (int j = 0; j < 80; j++) {
         cls_confidences.add(floatArray[NUM_ELEMENTS * (4 + j) + i]);
@@ -200,8 +225,8 @@ class ObjectDetection {
           maxClsIdx: maxClsIdx,
           left: left,
           top: top,
-          right : right ,
-          bottom: bottom ,
+          right: right,
+          bottom: bottom,
           width: width,
           height: height,
           maxClsConfidence: maxClsConfidence,
@@ -243,6 +268,7 @@ class ObjectDetection {
     }
     return selectedBoxes;
   }
+
   List<BoundingBox> filtrerMaxConfidence(List<BoundingBox> boundingBoxes) {
     Map<int, BoundingBox> tempMap = {};
     for (var box in boundingBoxes) {
@@ -256,24 +282,23 @@ class ObjectDetection {
     }
     return tempMap.values.toList();
   }
+
   void dispose() {
     _interpreter?.close();
     bestbox = null;
     _labels = null;
     OriginalImage = null;
-    ScreenX = null ;
-    ScreenY  = null;
+    ScreenX = null;
+    ScreenY = null;
   }
 
-  static  int TENSOR_WIDTH = 640;
-  static  int TENSOR_HEIGHT = 640;
-  static  double TENSOR_WIDTH_FLOAT = TENSOR_WIDTH.toDouble();
-  static  double TENSOR_HEIGHT_FLOAT = TENSOR_HEIGHT.toDouble();
+  static int TENSOR_WIDTH = 640;
+  static int TENSOR_HEIGHT = 640;
+  static double TENSOR_WIDTH_FLOAT = TENSOR_WIDTH.toDouble();
+  static double TENSOR_HEIGHT_FLOAT = TENSOR_HEIGHT.toDouble();
   static const double INPUT_MEAN = 0;
   static const double INPUT_STANDARD_DEVIATION = 255;
   static const int NUM_ELEMENTS = 8400;
   static const double CONFIDENCE_THRESHOLD = 0.5;
   static const double IOU_THRESHOLD = 0.5;
-
-
 }
