@@ -44,9 +44,17 @@ class _CameraHomeState extends State<HomePage> {
       body: Stack(
         children: [
           Camera(widget.cameras,setRecognitions),
-          BndBox(boxes , _labels, _screenHeight, _screenWidth),
+          Align(
+            alignment: Alignment.topCenter,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 50.0),
+              child: BndBox(boxes, _labels, _screenHeight, _screenWidth, ),
+
+            ),
+          ),
         ],
       ),
     );
   }
+
 }

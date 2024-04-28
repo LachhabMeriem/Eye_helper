@@ -122,7 +122,8 @@ class _ObjectDetectionScreenState extends State<Camera> {
   @override
   void initState() {
     super.initState();
-    objectDetection = ObjectDetection();
+    objectDetection = ObjectDetection(context, cameras);
+
     if (widget.cameras.isEmpty) {
       print('No camera is found');
     } else {

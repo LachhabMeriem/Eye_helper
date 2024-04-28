@@ -3,13 +3,14 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:camera/camera.dart';
+import 'package:eye_helper_project/main.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'BoundingBox.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'drawingboxes.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:flutter/material.dart';
 
 class ObjectDetection {
   stt.SpeechToText _speech = stt.SpeechToText();
@@ -135,7 +136,7 @@ class ObjectDetection {
     return image;
   }
 
-  void analyseImage(final imagePath) async {
+  Future<void> analyseImage(final imagePath, BuildContext context) async {
     log('Analysing image...');
 
     // final image = convertYUV420ToImage(cameraImage);
@@ -179,15 +180,47 @@ class ObjectDetection {
     }
 
     // Lecture des noms des objets détectés
-    await readDetectedObjects(detectedObjects);
+    await readDetectedObjects(detectedObjects, context);
   }
 
   // Méthode pour lire le nom des objets détectés
-  Future<void> readDetectedObjects(List<String> detectedObjects) async {
+  Future<void> readDetectedObjects(List<String> detectedObjects, BuildContext context) async {
     for (String objectName in detectedObjects) {
-      await flutterTts.speak("Object detected: $objectName");
+      await flutterTts.speak("Objet détecté : $objectName Voulez-vous continuer la détection d'objets ?");
+      await askToContinueDetection(context);
     }
   }
+
+  Future<void> askToContinueDetection(BuildContext context) async {
+    bool isListening = await _speech.listen(
+      onResult: (result) async {
+        if (result.finalResult) {
+          // Convertir les mots reconnus en minuscules pour une comparaison insensible à la casse
+          String recognizedWords = result.recognizedWords.toLowerCase();
+          if (recognizedWords.contains('oui')) {
+            // Redémarrer l'application
+            restartApp(context);
+          } else if (recognizedWords.contains('non')) {
+            // Quitter l'application
+            exit(0);
+          } else {
+            // Option non reconnue, répéter la question
+            await flutterTts.speak("Je suis désolé, je n'ai pas compris. Voulez-vous continuer la détection d'objets ?");
+            await askToContinueDetection(context);
+          }
+        }
+      },
+      listenMode: stt.ListenMode.confirmation,
+    );
+
+    if (!isListening) {
+      // Si la reconnaissance vocale n'est pas disponible, demander à nouveau
+      await flutterTts.speak("Désolé, la reconnaissance vocale n'est pas disponible. Voulez-vous continuer la détection d'objets ?");
+      await askToContinueDetection(context);
+    }
+  }
+
+
 
   List _runInference(final imageMatrix) {
     log('Running inference...');
@@ -301,4 +334,12 @@ class ObjectDetection {
   static const int NUM_ELEMENTS = 8400;
   static const double CONFIDENCE_THRESHOLD = 0.5;
   static const double IOU_THRESHOLD = 0.5;
+
+  // Fonction pour redémarrer l'application
+  void restartApp(BuildContext context) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (BuildContext context) => MyApp()),
+    );
+  }
 }
