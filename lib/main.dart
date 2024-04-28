@@ -1,3 +1,72 @@
+// import 'package:flutter/material.dart';
+// import 'package:camera/camera.dart';
+// import 'home.dart';
+//
+// List<CameraDescription> cameras = <CameraDescription>[];
+//
+// void main() async {
+//   WidgetsFlutterBinding.ensureInitialized();
+//   try {
+//     cameras = await availableCameras();
+//     print(cameras);
+//   } on CameraException catch (e) {
+//     print(e.toString());
+//   }
+//   runApp(MyApp());
+// }
+//
+// class MyApp extends StatelessWidget {
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       home: Scaffold(
+//         appBar: AppBar(
+//           title: Text('Eye Helper'),
+//           centerTitle: true,
+//           backgroundColor: Colors.lightGreen.withOpacity(0.8),
+//         ),
+//         body: MyHomePage(),
+//         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+//       ),
+//     );
+//   }
+// }
+//
+// class MyHomePage extends StatelessWidget {
+//   @override
+//   Widget build(BuildContext context) {
+//     return Center(
+//       child: Column(
+//         mainAxisAlignment: MainAxisAlignment.center,
+//         children: <Widget>[
+//           SizedBox(height: 20),
+//           Text('Press the camera button below to launch the camera'),
+//           SizedBox(height: 20),
+//           ElevatedButton(
+//             onPressed: () {
+//               Navigator.push(
+//                 context,
+//                 MaterialPageRoute(builder: (context) => HomePage(cameras)),
+//               );
+//             },
+//             child: Icon(
+//               Icons.camera,
+//               size: 60.0,
+//               color: Colors.white,
+//             ),
+//             style: ElevatedButton.styleFrom(
+//               backgroundColor: Colors.lightGreen.withOpacity(0.8),
+//               elevation: 6,
+//               shape: CircleBorder(),
+//               padding: EdgeInsets.all(20),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
+
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -41,33 +110,10 @@ class _MyHomeState extends State<MyHome> {
   void initState() {
     super.initState();
     objectDetection = ObjectDetection();
-    _startListening();
+    _launchCamera();
   }
 
-  Future<void> _startListening() async {
-    // Ici, vous pouvez démarrer l'écoute du texte à l'aide de la bibliothèque de reconnaissance vocale.
-    // Par exemple, vous pouvez utiliser la bibliothèque 'speech_to_text' ou 'flutter_tts'.
-    // Une fois que le texte est détecté, appelez _handleSpeechCommand avec le texte détecté.
-    // Exemple: _handleSpeechCommand('1');
-  }
-
-  Future<void> _handleSpeechCommand(String command) async {
-    if (command.toLowerCase() == '1') {
-      // Lancer la capture d'image et la détection d'objets
-      await _launchCameraAndDetectObjects();
-    } else if (command.toLowerCase() == '2') {
-      // Accéder à la fonctionnalité de scanner le texte à partir d'une image
-      // Exemple : await _scanTextFromImage();
-    } else if (command.toLowerCase() == '3') {
-      // Quitter l'application
-      // Exemple : await _exitApp();
-    } else {
-      // Option non reconnue, demander à nouveau
-      await _startListening();
-    }
-  }
-
-  Future<void> _launchCameraAndDetectObjects() async {
+  Future<void> _launchCamera() async {
     final result = await imagePicker.pickImage(source: ImageSource.camera);
     if (result != null) {
       await objectDetection!.analyseImage(result.path, context);
@@ -93,3 +139,47 @@ class _MyHomeState extends State<MyHome> {
     );
   }
 }
+
+
+
+
+//
+//
+// import 'package:flutter/material.dart';
+// import 'package:camera/camera.dart';
+// import 'home.dart';
+//
+// List<CameraDescription> cameras = <CameraDescription>[];
+//
+// void main() async {
+//   WidgetsFlutterBinding.ensureInitialized();
+//   try {
+//     cameras = await availableCameras();
+//     print(cameras);
+//   } on CameraException catch (e) {
+//     print(e.toString());
+//   }
+//   runApp(MyApp());
+// }
+//
+// class MyApp extends StatelessWidget {
+//   @override
+//   Widget build(BuildContext context) {
+//     return MaterialApp(
+//       home: Scaffold(
+//         appBar: AppBar(
+//           title: Text('Eye Helper'),
+//           centerTitle: true,
+//           backgroundColor: Colors.lightGreen.withOpacity(0.8),
+//         ),
+//         body: HomePage(cameras),
+//       ),
+//     );
+//   }
+// }
+
+
+
+
+
+
