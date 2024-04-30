@@ -174,7 +174,7 @@ class ObjectDetection {
     // Récupération des noms des objets détectés
     List<String> detectedObjects = [];
     for (final box in bestbox!) {
-      if (box.maxClsConfidence > 0.60) {
+      if (box.maxClsConfidence > 0.50) {
         detectedObjects.add(_labels?[box.maxClsIdx] ?? "Unknown");
       }
     }
@@ -195,27 +195,45 @@ class ObjectDetection {
   // Fonction pour déterminer la position de l'objet par rapport au centre de l'image
   String determinePosition(String objectName) {
     // Calculer la position de l'objet par rapport au centre de l'image
-    double objectXPosition = getObjectXPosition(objectName);
+    double objectXPosition = getObjectXPosition(objectName, bestbox!);
+
 
     // Déterminer si l'objet est à gauche, à droite ou au centre en fonction de sa position horizontale
-    if (objectXPosition < 0.4) {
-      return "gauche ";
-    } else if (objectXPosition > 0.6) {
+    if (objectXPosition < 0.3) {
       return "droite";
+    } else if (objectXPosition > 0.6) {
+      return "gauche";
     } else {
       return "Centre";
     }
   }
 
   // Fonction pour obtenir la position horizontale (x) de l'objet par rapport au centre de l'image
-  double getObjectXPosition(String objectName) {
-    // Ajoutez la logique pour obtenir la position horizontale (x) de l'objet dans l'image.
-    // Cette logique dépendra de la manière dont les coordonnées des objets sont calculées dans votre application.
-    // Assurez-vous que cette fonction retourne une valeur entre 0 et 1, où 0 représente l'extrémité gauche de l'image
-    // et 1 représente l'extrémité droite de l'image.
-    // C'est juste un exemple de code, vous devez remplacer cette logique par la vôtre.
-    return 0.5; // Valeur de démonstration - au centre de l'image
+  double getObjectXPosition(String objectName, List<BoundingBox> detectedBoxes) {
+    // Recherchez la boîte englobante de l'objet correspondant au nom donné
+    BoundingBox? objectBox;
+    for (BoundingBox box in detectedBoxes) {
+      if (_labels?[box.maxClsIdx] == objectName) {
+        objectBox = box;
+        break;
+      }
+    }
+
+    // Si la boîte de l'objet est trouvée, calculez sa position horizontale
+    if (objectBox != null) {
+      // Calculez le centre horizontal de la boîte englobante
+      double boxCenterX = (objectBox.left + objectBox.right) / 2;
+
+      // Normalisez la position horizontale par rapport à la largeur de l'image
+      double normalizedXPosition = boxCenterX / ScreenX!;
+
+      return normalizedXPosition;
+    } else {
+      // Si la boîte de l'objet n'est pas trouvée, retournez une valeur par défaut (au centre de l'image)
+      return 0.5;
+    }
   }
+
 
   Future<void> askToContinueDetection(BuildContext context) async {
     bool isListening = await _speech.listen(
