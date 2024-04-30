@@ -1,72 +1,3 @@
-// import 'package:flutter/material.dart';
-// import 'package:camera/camera.dart';
-// import 'home.dart';
-//
-// List<CameraDescription> cameras = <CameraDescription>[];
-//
-// void main() async {
-//   WidgetsFlutterBinding.ensureInitialized();
-//   try {
-//     cameras = await availableCameras();
-//     print(cameras);
-//   } on CameraException catch (e) {
-//     print(e.toString());
-//   }
-//   runApp(MyApp());
-// }
-//
-// class MyApp extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       home: Scaffold(
-//         appBar: AppBar(
-//           title: Text('Eye Helper'),
-//           centerTitle: true,
-//           backgroundColor: Colors.lightGreen.withOpacity(0.8),
-//         ),
-//         body: MyHomePage(),
-//         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-//       ),
-//     );
-//   }
-// }
-//
-// class MyHomePage extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) {
-//     return Center(
-//       child: Column(
-//         mainAxisAlignment: MainAxisAlignment.center,
-//         children: <Widget>[
-//           SizedBox(height: 20),
-//           Text('Press the camera button below to launch the camera'),
-//           SizedBox(height: 20),
-//           ElevatedButton(
-//             onPressed: () {
-//               Navigator.push(
-//                 context,
-//                 MaterialPageRoute(builder: (context) => HomePage(cameras)),
-//               );
-//             },
-//             child: Icon(
-//               Icons.camera,
-//               size: 60.0,
-//               color: Colors.white,
-//             ),
-//             style: ElevatedButton.styleFrom(
-//               backgroundColor: Colors.lightGreen.withOpacity(0.8),
-//               elevation: 6,
-//               shape: CircleBorder(),
-//               padding: EdgeInsets.all(20),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -74,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 import 'object_detection.dart';
 import 'dart:io' show Platform;
 import 'BoundingBoxPage.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter_tts/flutter_tts.dart';
 
 void main() => runApp(const MyApp());
 
@@ -105,18 +38,40 @@ class _MyHomeState extends State<MyHome> {
   final imagePicker = ImagePicker();
   ObjectDetection? objectDetection;
   Uint8List? image;
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  final FlutterTts _flutterTts = FlutterTts();
 
   @override
   void initState() {
     super.initState();
     objectDetection = ObjectDetection();
-    _launchCamera();
+    WidgetsBinding.instance!.addPostFrameCallback((_) {
+      _initSpeech();
+      _speakInstruction();
+    });
+  }
+
+  Future<void> _initSpeech() async {
+    bool available = await _speech.initialize();
+    if (!available) {
+      print("La reconnaissance vocale n'est pas disponible.");
+    } else {
+      _speech.listen(
+        onResult: (result) {
+          String command = result.recognizedWords.toLowerCase();
+          if (command.contains("ok")) {
+            _flutterTts.speak("Lancement de la caméra.");
+            _launchCamera();
+          }
+        },
+      );
+    }
   }
 
   Future<void> _launchCamera() async {
     final result = await imagePicker.pickImage(source: ImageSource.camera);
     if (result != null) {
-      await objectDetection!.analyseImage(result.path, context);
+      objectDetection!.analyseImage(result.path, context);
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -128,58 +83,26 @@ class _MyHomeState extends State<MyHome> {
     }
   }
 
+  Future<void> _speakInstruction() async {
+    await _flutterTts.speak("Pour détecter un objet, dites 'ok'");
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: CircularProgressIndicator(),
+      appBar: AppBar(
+        title: const Text('Voice Assistant'),
+        centerTitle: true,
+        backgroundColor: Colors.lightGreen.withOpacity(0.8),
+      ),
+      body: Center(
+        child: IconButton(
+          icon: const Icon(Icons.mic),
+          iconSize: 60.0,
+          color: Colors.lightGreen.withOpacity(0.8),
+          onPressed: () {}, // Bouton inactif puisque la reconnaissance vocale est automatisée
         ),
       ),
     );
   }
 }
-
-
-
-
-//
-//
-// import 'package:flutter/material.dart';
-// import 'package:camera/camera.dart';
-// import 'home.dart';
-//
-// List<CameraDescription> cameras = <CameraDescription>[];
-//
-// void main() async {
-//   WidgetsFlutterBinding.ensureInitialized();
-//   try {
-//     cameras = await availableCameras();
-//     print(cameras);
-//   } on CameraException catch (e) {
-//     print(e.toString());
-//   }
-//   runApp(MyApp());
-// }
-//
-// class MyApp extends StatelessWidget {
-//   @override
-//   Widget build(BuildContext context) {
-//     return MaterialApp(
-//       home: Scaffold(
-//         appBar: AppBar(
-//           title: Text('Eye Helper'),
-//           centerTitle: true,
-//           backgroundColor: Colors.lightGreen.withOpacity(0.8),
-//         ),
-//         body: HomePage(cameras),
-//       ),
-//     );
-//   }
-// }
-
-
-
-
-
-

@@ -48,12 +48,12 @@ class ObjectDetection {
     log('Loading interpreter options...');
     final interpreterOptions = InterpreterOptions();
 
-    // Use XNNPACK Delegate
+    // Utiliser le délégué XNNPACK
     if (Platform.isAndroid) {
       interpreterOptions.addDelegate(XNNPackDelegate());
     }
 
-    // Use Metal Delegate
+    // Utiliser le délégué Metal
     if (Platform.isIOS) {
       interpreterOptions.addDelegate(GpuDelegate());
     }
@@ -109,7 +109,7 @@ class ObjectDetection {
 
         final yIndex = (h * yRowStride) + (w * yPixelStride);
 
-        // Y plane should have positive values belonging to [0...255]
+        // Le plan Y doit avoir des valeurs positives appartenant à [0...255]
         final int y = yBuffer[yIndex];
 
         final int uvIndex = (uvh * uvRowStride) + (uvw * uvPixelStride);
@@ -186,9 +186,35 @@ class ObjectDetection {
   // Méthode pour lire le nom des objets détectés
   Future<void> readDetectedObjects(List<String> detectedObjects, BuildContext context) async {
     for (String objectName in detectedObjects) {
-      await flutterTts.speak("Objet détecté : $objectName Voulez-vous continuer la détection d'objets ?");
+      String position = determinePosition(objectName);
+      await flutterTts.speak("Objet détecté : $objectName. Position : $position. Voulez-vous continuer la détection d'objets ?");
       await askToContinueDetection(context);
     }
+  }
+
+  // Fonction pour déterminer la position de l'objet par rapport au centre de l'image
+  String determinePosition(String objectName) {
+    // Calculer la position de l'objet par rapport au centre de l'image
+    double objectXPosition = getObjectXPosition(objectName);
+
+    // Déterminer si l'objet est à gauche, à droite ou au centre en fonction de sa position horizontale
+    if (objectXPosition < 0.4) {
+      return "gauche ";
+    } else if (objectXPosition > 0.6) {
+      return "droite";
+    } else {
+      return "Centre";
+    }
+  }
+
+  // Fonction pour obtenir la position horizontale (x) de l'objet par rapport au centre de l'image
+  double getObjectXPosition(String objectName) {
+    // Ajoutez la logique pour obtenir la position horizontale (x) de l'objet dans l'image.
+    // Cette logique dépendra de la manière dont les coordonnées des objets sont calculées dans votre application.
+    // Assurez-vous que cette fonction retourne une valeur entre 0 et 1, où 0 représente l'extrémité gauche de l'image
+    // et 1 représente l'extrémité droite de l'image.
+    // C'est juste un exemple de code, vous devez remplacer cette logique par la vôtre.
+    return 0.5; // Valeur de démonstration - au centre de l'image
   }
 
   Future<void> askToContinueDetection(BuildContext context) async {
@@ -219,8 +245,6 @@ class ObjectDetection {
       await askToContinueDetection(context);
     }
   }
-
-
 
   List _runInference(final imageMatrix) {
     log('Running inference...');
