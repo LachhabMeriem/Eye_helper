@@ -174,7 +174,7 @@ class ObjectDetection {
     // Récupération des noms des objets détectés
     List<String> detectedObjects = [];
     for (final box in bestbox!) {
-      if (box.maxClsConfidence > 0.50) {
+      if (box.maxClsConfidence > 0.40) {
         detectedObjects.add(_labels?[box.maxClsIdx] ?? "Unknown");
       }
     }
@@ -182,15 +182,24 @@ class ObjectDetection {
     // Lecture des noms des objets détectés
     await readDetectedObjects(detectedObjects, context);
   }
-
-  // Méthode pour lire le nom des objets détectés
   Future<void> readDetectedObjects(List<String> detectedObjects, BuildContext context) async {
-    for (String objectName in detectedObjects) {
-      String position = determinePosition(objectName);
-      await flutterTts.speak("Objet détecté : $objectName. Position : $position. Voulez-vous continuer la détection d'objets ?");
-      await askToContinueDetection(context);
+    // Construire le texte à lire contenant les objets détectés et leur position
+    String objectsText = "Objets détectés : ";
+    for (int i = 0; i < detectedObjects.length; i++) {
+      objectsText += detectedObjects[i];
+      // Lire la position de l'objet
+      objectsText += ", position : ${determinePosition(detectedObjects[i])}";
+      if (i < detectedObjects.length - 1) {
+        objectsText += ", ";
+      }
     }
+
+    // Lire le texte contenant les objets détectés et poser la question pour continuer
+    await flutterTts.speak("$objectsText, voulez-vous continuer la détection des objets ?");
+    await askToContinueDetection(context);
   }
+
+
 
   // Fonction pour déterminer la position de l'objet par rapport au centre de l'image
   String determinePosition(String objectName) {
@@ -199,10 +208,10 @@ class ObjectDetection {
 
 
     // Déterminer si l'objet est à gauche, à droite ou au centre en fonction de sa position horizontale
-    if (objectXPosition < 0.3) {
-      return "droite";
-    } else if (objectXPosition > 0.6) {
+    if (objectXPosition < 0.25) {
       return "gauche";
+    } else if (objectXPosition > 0.55) {
+      return "droite";
     } else {
       return "Centre";
     }

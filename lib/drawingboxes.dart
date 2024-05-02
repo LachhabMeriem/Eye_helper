@@ -46,12 +46,13 @@ class BoundingBoxPainter extends CustomPainter {
   BoundingBoxPainter(this.results, this.labels, this.screenX, this.screenY);
 
   @override
-  void paint(Canvas canvas, Size size) {
+void paint(Canvas canvas, Size size) {
     if (results != null) {
       final double scaleX = size.width / screenX;
       final double scaleY = size.height / screenY;
 
-      for (final box in results!) {
+      for (int i = 0; i < results!.length; i++) {
+        final box = results![i];
         final left = box.left ;
         final top = box.top ;
         final right = box.right * scaleX;
@@ -81,7 +82,9 @@ class BoundingBoxPainter extends CustomPainter {
           textDirection: TextDirection.ltr,
         );
         textPainter.layout();
-        textPainter.paint(canvas, Offset(left, top - 20));
+        final verticalPosition = top + (i * (textPainter.height + 5)); // Ajustez 5 selon l'espace souhaité entre les textes
+
+        textPainter.paint(canvas, Offset(left, verticalPosition));
       }
     }
   }
