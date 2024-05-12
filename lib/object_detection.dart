@@ -188,38 +188,25 @@ class ObjectDetection {
     for (int i = 0; i < detectedObjects.length; i++) {
       objectsText += detectedObjects[i];
       // Lire la position de l'objet
-      objectsText += ", position : ${determinePosition(detectedObjects[i])}";
+      objectsText += ", position : ${determinePosition(detectedObjects[i], bestbox!)}";
+
       if (i < detectedObjects.length - 1) {
         objectsText += ", ";
       }
     }
 
     // Lire le texte contenant les objets détectés et poser la question pour continuer
-    await flutterTts.speak("$objectsText, voulez-vous continuer la détection des objets ?");
+    await flutterTts.speak("$objectsText, Voulez-vous faire une nouvelle capture ?");
     await askToContinueDetection(context);
   }
 
 
 
   // Fonction pour déterminer la position de l'objet par rapport au centre de l'image
-  String determinePosition(String objectName) {
-    // Calculer la position de l'objet par rapport au centre de l'image
-    double objectXPosition = getObjectXPosition(objectName, bestbox!);
+    // Fonction pour obtenir la position horizontale (x) de l'objet par rapport au centre de l'image
 
-
-    // Déterminer si l'objet est à gauche, à droite ou au centre en fonction de sa position horizontale
-    if (objectXPosition < 0.25) {
-      return "gauche";
-    } else if (objectXPosition > 0.55) {
-      return "droite";
-    } else {
-      return "Centre";
-    }
-  }
-
-  // Fonction pour obtenir la position horizontale (x) de l'objet par rapport au centre de l'image
-  double getObjectXPosition(String objectName, List<BoundingBox> detectedBoxes) {
-    // Recherchez la boîte englobante de l'objet correspondant au nom donné
+  String determinePosition(String objectName, List<BoundingBox> detectedBoxes) {
+    // Trouver la boîte englobante de l'objet donné
     BoundingBox? objectBox;
     for (BoundingBox box in detectedBoxes) {
       if (_labels?[box.maxClsIdx] == objectName) {
@@ -228,22 +215,37 @@ class ObjectDetection {
       }
     }
 
-    // Si la boîte de l'objet est trouvée, calculez sa position horizontale
+    // Si la boîte de l'objet est trouvée, déterminer sa position par rapport aux autres objets
     if (objectBox != null) {
-      // Calculez le centre horizontal de la boîte englobante
-      double boxCenterX = (objectBox.left + objectBox.right) / 2;
+      // Récupérer le centre horizontal de la boîte englobante de l'objet donné
+      double objectCenterX = (objectBox.left + objectBox.right) / 2;
 
-      // Normalisez la position horizontale par rapport à la largeur de l'image
-      double normalizedXPosition = boxCenterX / ScreenX!;
+      // Parcourir toutes les autres boîtes pour déterminer leur position par rapport à l'objet donné
+      int objectsLeft = 0;
+      int objectsRight = 0;
+      for (BoundingBox box in detectedBoxes) {
+        if (_labels?[box.maxClsIdx] != objectName) {
+          double boxCenterX = (box.left + box.right) / 2;
+          if (boxCenterX < objectCenterX) {
+            objectsLeft++;
+          } else {
+            objectsRight++;
+          }
+        }
+      }
 
-      return normalizedXPosition;
+      // Déterminez la position de l'objet en fonction du nombre d'objets à sa gauche et à sa droite
+      if (objectsLeft > objectsRight) {
+        return "droite";
+      } else if (objectsRight > objectsLeft) {
+        return "gauche";
+      } else {
+        return "centre";
+      }
     } else {
-      // Si la boîte de l'objet n'est pas trouvée, retournez une valeur par défaut (au centre de l'image)
-      return 0.5;
+      return "Non trouvé";
     }
   }
-
-
   Future<void> askToContinueDetection(BuildContext context) async {
     bool isListening = await _speech.listen(
       onResult: (result) async {

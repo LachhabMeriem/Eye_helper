@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:eye_helper_project/widget_reader.dart';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -59,9 +60,12 @@ class _MyHomeState extends State<MyHome> {
       _speech.listen(
         onResult: (result) {
           String command = result.recognizedWords.toLowerCase();
-          if (command.contains("ok")) {
-            _flutterTts.speak("Lancement de la caméra.");
+          if (command.contains("oui")) {
+            _flutterTts.speak("Lancement de la caméra pour la détection des objets.");
             _launchCamera();
+          } else if (command.contains("non")) {
+            //_flutterTts.speak("Lancement de la caméra pour le scan du texte.");
+            _launchCameraForAnalysis();
           }
         },
       );
@@ -82,9 +86,20 @@ class _MyHomeState extends State<MyHome> {
       );
     }
   }
+  Future<void> _launchCameraForAnalysis() async {
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ReaderWidget(),
+        ),
+      );
+
+  }
+
 
   Future<void> _speakInstruction() async {
-    await _flutterTts.speak("Pour détecter un objet, dites 'ok'");
+    await _flutterTts.speak("Pour détecter un objet, dites 'oui'. Pour un scan du texte, dites 'non'.");
   }
 
   @override
