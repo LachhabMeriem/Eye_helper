@@ -39,9 +39,7 @@ class _MyHomeState extends State<MyHome> {
   final ImagePicker _imagePicker = ImagePicker();
   final stt.SpeechToText _speech = stt.SpeechToText();
   final FlutterTts _flutterTts = FlutterTts();
-  final String _ocrApiKey = "K88476900388957";
-  final String _ocrApiUrl = "https://api.ocr.space/parse/image";
-
+  String replyText = '';
   @override
   void initState() {
     super.initState();
@@ -67,38 +65,33 @@ class _MyHomeState extends State<MyHome> {
   }
 
   Future<void> _launchCamera() async {
-    final XFile? result = await _imagePicker.pickImage(source: ImageSource.camera);
-    if (result!=null){
+    final XFile? result = await imagePicker.pickImage(source: ImageSource.camera);
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
     final RecognizedText recognizedText =
     await textRecognizer.processImage(InputImage.fromFilePath(result!.path));
     String parsedText = recognizedText.text.toString();
-    print(parsedText);
-    _sendDataToModel(parsedText);
-    
-
-  }}
+    await _sendDataToModel(parsedText);
+  }
 
   Future<void> _sendDataToModel(String parsedText) async {
     try {
-      var url = Uri.parse('http://127.0.0.1:5000/api');
-      var response = await http.post(
-        url,
-        headers: <String, String>{
-          'Content-Type': 'application/json; charset=UTF-8',
-        },
-        body: jsonEncode(<String, String>{
-          'text': parsedText,
-        }),
-      );
+      HttpClient httpClient = HttpClient();
+      const url = "https://a957-105-191-94-217.ngrok-free.app/api";
+      Map data = {
+        "text": parsedText,
+      };
+      HttpClientRequest request = await httpClient.postUrl(Uri.parse(url));
+      request.headers.set('content-type', 'application/json');
+      request.add(utf8.encode(json.encode(data)));
+      HttpClientResponse response = await request.close();
+      String reply = await response.transform(utf8.decoder).join();
+      httpClient.close();
+      Map<String, dynamic> jsonResponse = json.decode(reply);
+      String summary = jsonResponse["summary"];
+      setState(() {
+        replyText = summary;
+      });
 
-      if (response.statusCode == 200) {
-        var responseData = jsonDecode(response.body);
-        var result = responseData['result'];
-        print('Result from server: $result');
-      } else {
-        print('Request failed with status: ${response.statusCode}');
-      }
     } catch (e) {
       print('Failed to send data to the server: $e');
     }
@@ -106,11 +99,33 @@ class _MyHomeState extends State<MyHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: Text('Summary'),
+      ),
       body: SafeArea(
         child: Center(
-          child: CircularProgressIndicator(),
+          child: Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Container(
+              padding: EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.grey[200], // Background color
+                borderRadius: BorderRadius.circular(10.0), // Rounded corners
+              ),
+              child: Text(
+                replyText,
+                style: TextStyle(
+                  fontSize: 18.0,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
+
 }
